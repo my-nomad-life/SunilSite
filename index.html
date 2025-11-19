@@ -111,12 +111,14 @@
       margin-bottom: 0.4rem;
     }
 
-    /* Main window content */
     .main-header {
-      padding: 1rem;
-      border-bottom: 1px solid #e5e7eb;
-      background: #111827;
-      color: #f9fafb;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #111827;
+  color: #f9fafb;
+  cursor: move;          /* so you see it’s draggable */
+  user-select: none;     /* no text selection while dragging */
+}
     }
 
     .main-header h1 {
@@ -230,6 +232,8 @@
         <span>click a tile to open a window</span>
       </div>
       <div class="main-body">
+        <img src="main.svg" alt="Main illustration" style="max-width: 100%; border-radius: 12px; margin-bottom: 0.75rem;">
+        
         <p>Welcome! Choose a window to explore my work and info.</p>
         <div class="window-button-grid">
           <button class="open-window-btn" data-window="about-window">
@@ -325,85 +329,88 @@
   </div>
 
   <script>
-    // Bring window to front
-    let highestZ = 20;
+  // Bring window to front
+  let highestZ = 20;
 
-    function bringToFront(win) {
-      highestZ += 1;
-      win.style.zIndex = highestZ;
-    }
+  function bringToFront(win) {
+    highestZ += 1;
+    win.style.zIndex = highestZ;
+  }
 
-    // Open windows when clicking main buttons
-    document.querySelectorAll('.open-window-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-window');
-        const win = document.getElementById(id);
-        if (!win) return;
-        win.style.display = 'block';
-        bringToFront(win);
-      });
+  // Open windows when clicking main buttons
+  document.querySelectorAll('.open-window-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-window');
+      const win = document.getElementById(id);
+      if (!win) return;
+      win.style.display = 'block';
+      bringToFront(win);
+    });
+  });
+
+  // Close buttons
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const win = e.target.closest('.window');
+      if (win) {
+        win.style.display = 'none';
+      }
+    });
+  });
+
+  // Dragging logic (can use custom handle)
+  function makeDraggable(win, handleSelector = '.window-header') {
+    if (!win) return;
+    const handle = win.querySelector(handleSelector) || win;
+
+    let offsetX = 0;
+    let offsetY = 0;
+    let isDragging = false;
+
+    handle.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      bringToFront(win);
+      const rect = win.getBoundingClientRect();
+      offsetX = e.clientX - rect.left;
+      offsetY = e.clientY - rect.top;
+      document.body.classList.add('no-select');
     });
 
-    // Close buttons
-    document.querySelectorAll('[data-close]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const win = e.target.closest('.window');
-        if (win) {
-          win.style.display = 'none';
-        }
-      });
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+
+      const desktopRect = document.querySelector('.desktop').getBoundingClientRect();
+      let x = e.clientX - offsetX;
+      let y = e.clientY - offsetY;
+
+      const maxX = desktopRect.width - win.offsetWidth;
+      const maxY = desktopRect.height - win.offsetHeight - 40; // above taskbar
+
+      if (x < desktopRect.left) x = desktopRect.left;
+      if (y < desktopRect.top) y = desktopRect.top;
+      if (x > maxX) x = maxX;
+      if (y > maxY) y = maxY;
+
+      win.style.left = x + 'px';
+      win.style.top = y + 'px';
     });
 
-    // Dragging logic
-    function makeDraggable(win) {
-      const header = win.querySelector('.window-header');
-      if (!header) return;
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      document.body.classList.remove('no-select');
+    });
 
-      let offsetX = 0;
-      let offsetY = 0;
-      let isDragging = false;
+    // Bring to front when clicking anywhere on that window
+    win.addEventListener('mousedown', () => bringToFront(win));
+  }
 
-      header.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        bringToFront(win);
-        const rect = win.getBoundingClientRect();
-        offsetX = e.clientX - rect.left;
-        offsetY = e.clientY - rect.top;
-        document.body.classList.add('no-select');
-      });
+  // Make all “popup” windows draggable using their header
+  document.querySelectorAll('.window').forEach(win => makeDraggable(win));
 
-      document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
+  // Make the main menu draggable using its .main-header
+  const mainWindow = document.querySelector('.main-window');
+  makeDraggable(mainWindow, '.main-header');
+</script>
 
-        const desktopRect = document.querySelector('.desktop').getBoundingClientRect();
-        let x = e.clientX - offsetX;
-        let y = e.clientY - offsetY;
-
-        // Optional: keep window vaguely inside the desktop
-        const maxX = desktopRect.width - win.offsetWidth;
-        const maxY = desktopRect.height - win.offsetHeight - 40; // above taskbar
-
-        if (x < desktopRect.left) x = desktopRect.left;
-        if (y < desktopRect.top) y = desktopRect.top;
-        if (x > maxX) x = maxX;
-        if (y > maxY) y = maxY;
-
-        win.style.left = x + 'px';
-        win.style.top = y + 'px';
-      });
-
-      document.addEventListener('mouseup', () => {
-        isDragging = false;
-        document.body.classList.remove('no-select');
-      });
-
-      // Also bring to front when clicking anywhere on window
-      win.addEventListener('mousedown', () => bringToFront(win));
-    }
-
-    // Make all windows draggable (including main window if you want)
-    document.querySelectorAll('.window').forEach(makeDraggable);
-    makeDraggable(document.querySelector('.main-window'));
-  </script>
 </body>
 </html>
